@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visualizing Uneven Public Safety — NYC Shooting Redistribution by Neighborhood</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --navy:#12164f;
+      --navy-2:#241f66;
+      --ink:#14172f;
+      --muted:#63677a;
+      --paper:#ffffff;
+      --page:#fbfafc;
+      --rule:#d8d2e5;
+      --rule-light:#eeeaf5;
+      --cream:#fbf8ff;
+      --cream-border:#d8cde9;
+      --improved:#3f5f38;
+      --redistribution:#b58616;
+      --worsened:#c4412d;
+      --check:#a0a1aa;
+      --soft-blue:#fbf9ff;
+      --soft-green:#f8fbf6;
+      --soft-red:#fff8f6;
+      --soft-gold:#fffaf0;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      padding:34px 22px;
+      font-family:Arial,Helvetica,sans-serif;
+      background:var(--page);
+      color:var(--ink);
+    }
+    .dashboard{
+      width:min(1160px,100%);
+      margin:0 auto;
+      background:var(--paper);
+      border:1px solid var(--rule);
+      border-radius:6px;
+      box-shadow:0 2px 10px rgba(18,22,79,.045);
+      overflow:hidden;
+    }
+    header{
+      padding:34px 42px 24px;
+      background:#fff;
+      border-bottom:1px solid var(--rule);
+    }
+    h1{
+      margin:0 0 10px;
+      color:var(--navy);
+      font-family:Georgia,'Times New Roman',serif;
+      font-size:clamp(30px,4vw,48px);
+      line-height:1.05;
+      letter-spacing:-.025em;
+      font-weight:700;
+      max-width:980px;
+    }
+    .subtitle{
+      margin:0;
+      max-width:900px;
+      color:#4a4d62;
+      font-size:15px;
+      line-height:1.65;
+    }
+    .panel{padding:26px 42px 38px}
+    .status{
+      display:block;
+      background:#f8fafc;
+      border:1px solid var(--rule);
+      border-left:1px solid var(--rule);
+      border-radius:4px;
+      padding:12px 14px;
+      margin-bottom:18px;
+      color:#3b4652;
+      font-size:13px;
+      line-height:1.5;
+    }
+    .status strong{color:var(--navy)}
+    .status.error{background:#fff7ed;border-color:#fed7aa;border-left-color:#9a3412;color:#9a3412}
+    .status.ok{background:#f6fbf7;border-color:#cde8d2;border-left-color:var(--improved);color:#235c3c}
+    .caution-note{
+      margin-top:18px;
+      background:var(--cream);
+      border:1px solid var(--cream-border);
+      border-left:1px solid var(--cream-border);
+      color:var(--navy);
+      border-radius:4px;
+      padding:11px 14px;
+      font-size:13px;
+      line-height:1.5;
+      max-width:920px;
+    }
+    .read-box{
+      background:#fff;
+      border:1px solid var(--rule);
+      border-left:1px solid var(--rule);
+      border-radius:4px;
+      padding:15px 17px;
+      margin:0 0 18px;
+      color:#394554;
+      font-size:13px;
+      line-height:1.6;
+    }
+    .read-box strong{color:var(--navy);font-family:Georgia,'Times New Roman',serif;font-size:15px}
+    .policy-card{
+      background:var(--soft-blue);
+      border:1px solid var(--rule);
+      border-left:1px solid var(--rule);
+      border-radius:4px;
+      padding:15px 17px;
+      margin:18px 0;
+      color:#394554;
+      font-size:13px;
+      line-height:1.6;
+    }
+    .policy-card strong{color:var(--navy);font-family:Georgia,'Times New Roman',serif;font-size:15px}
+    .top-table-card{
+      border-top:2px solid var(--navy);
+      background:#fff;
+      margin-top:22px;
+      padding:18px 0 0;
+    }
+    .top-table-head{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:end;
+      justify-content:space-between;
+      margin-bottom:10px;
+    }
+    .top-table-head h2{
+      margin:0;
+      color:var(--navy);
+      font-family:Georgia,'Times New Roman',serif;
+      font-size:21px;
+      letter-spacing:-.01em;
+    }
+    .top-table-head select{max-width:340px}
+    .top-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+    .top-table th{
+      font-size:10.5px;
+      text-transform:uppercase;
+      letter-spacing:.07em;
+      color:#596474;
+      text-align:left;
+      border-bottom:1px solid var(--rule);
+      padding:9px 7px;
+      background:#fafbfc;
+    }
+    .top-table td{border-bottom:1px solid var(--rule-light);padding:10px 7px;vertical-align:top}
+    .top-table tr:hover td{background:#fafcfe}
+    .top-table .rank{font-weight:800;color:var(--navy);width:42px}
+    .top-table .badge{
+      display:inline-block;
+      border-radius:3px;
+      padding:3px 7px;
+      font-size:11px;
+      font-weight:800;
+      background:#f0f3f6;
+      color:var(--navy);
+    }
+    .toolbar{
+      display:grid;
+      grid-template-columns:1.25fr .86fr .86fr .94fr 1.05fr auto;
+      gap:12px;
+      align-items:end;
+      margin-bottom:20px;
+      padding:16px;
+      background:#fbfcfd;
+      border:1px solid var(--rule);
+      border-radius:4px;
+    }
+    label{
+      display:block;
+      font-size:10.5px;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.085em;
+      color:#596474;
+      margin-bottom:6px;
+    }
+    input,select,button{
+      width:100%;
+      border:1px solid #cdd5de;
+      border-radius:3px;
+      background:#fff;
+      color:var(--ink);
+      font-size:13.5px;
+      padding:10px 11px;
+      outline:none;
+    }
+    input:focus,select:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(15,47,74,.10)}
+    button{
+      cursor:pointer;
+      background:var(--navy);
+      color:#fff;
+      font-weight:800;
+      border-color:var(--navy);
+      transition:background .15s ease,opacity .15s ease;
+      white-space:nowrap;
+    }
+    button:hover{background:var(--navy-2);opacity:.96}
+    button.secondary{background:#fff;color:var(--navy)}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .legend{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px 18px;
+      margin:2px 0 18px;
+      color:#3b4652;
+      font-size:12.5px;
+    }
+    .legend-item{display:flex;align-items:center;gap:7px}
+    .dot{width:11px;height:11px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.08)}
+    .stats{
+      display:grid;
+      grid-template-columns:repeat(5,minmax(0,1fr));
+      gap:12px;
+      margin:16px 0 18px;
+      align-items:stretch;
+    }
+    .stat-card{
+      background:#fff;
+      border:1px solid var(--rule);
+      border-top:3px solid var(--navy);
+      border-radius:4px;
+      padding:13px 11px;
+      text-align:left;
+      min-height:76px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+    }
+    .stat-number{font-size:25px;line-height:1;font-weight:800;color:var(--navy);margin-bottom:5px}
+    .stat-label{color:var(--muted);font-size:11.5px;line-height:1.3;text-transform:uppercase;letter-spacing:.035em;font-weight:700}
+    .chart-wrap{
+      position:relative;
+      height:610px;
+      border:1px solid var(--rule);
+      border-radius:4px;
+      background:#fff;
+      padding:10px;
+    }
+    #customTooltip{
+      position:fixed;
+      display:none;
+      width:345px;
+      background:#fff;
+      border:1px solid #cfd7e0;
+      border-top:4px solid var(--navy);
+      border-radius:4px;
+      box-shadow:0 12px 26px rgba(15,23,42,.16);
+      padding:14px 15px;
+      pointer-events:none;
+      z-index:1000;
+      font-size:12px;
+      line-height:1.5;
+    }
+    .tooltip-title{font-family:Georgia,'Times New Roman',serif;font-size:17px;font-weight:700;color:var(--navy);margin-bottom:2px;line-height:1.2}
+    .tooltip-boro{color:var(--muted);margin-bottom:8px;font-size:12px}
+    .tooltip-row{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--rule-light);padding-top:5px;margin-top:5px}
+    .tooltip-flag{margin:8px 0 2px;font-weight:800;letter-spacing:.02em}
+    .demo-title{margin-top:12px;padding-top:10px;border-top:1px solid #dfe6ed;font-weight:800;color:var(--navy)}
+    .bar-row{display:grid;grid-template-columns:90px 1fr 42px;gap:8px;align-items:center;margin-top:6px}
+    .bar-label{color:#3b4652}
+    .bar-shell{height:7px;background:#edf1f4;border-radius:999px;overflow:hidden}
+    .bar-fill{height:100%;border-radius:999px;background:var(--navy)}
+    .bar-value{text-align:right;font-weight:800;color:#3b4652}
+    .note{
+      margin:18px 0 0;
+      color:#657185;
+      font-size:12px;
+      line-height:1.55;
+      border-top:1px solid var(--rule);
+      padding-top:14px;
+    }
+    .small-note{font-size:11px;color:#7b8794;margin-top:8px;line-height:1.35}
+    .hidden{display:none!important}
+    @media (max-width:1060px){.toolbar{grid-template-columns:1fr 1fr 1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media (max-width:720px){body{padding:12px}header,.panel{padding-left:18px;padding-right:18px}.toolbar{grid-template-columns:1fr}.chart-wrap{height:520px}.stats{grid-template-columns:1fr}#customTooltip{width:305px}}
+    .default-note{
+      background:#fbf9ff;
+      border:1px solid var(--rule);
+      border-radius:4px;
+      padding:12px 14px;
+      margin:0 0 18px;
+      color:#394554;
+      font-size:13px;
+      line-height:1.5;
+    }
+
+    .default-note strong{
+      color:var(--navy);
+      font-family:Georgia,'Times New Roman',serif;
+      font-size:15px;
+    }
+
+    .limitations-note{
+      margin:10px 0 0;
+      color:#657185;
+      font-size:12px;
+      line-height:1.55;
+    }
+
+  </style>
+</head>
+<body>
+<main class="dashboard">
+  <header>
+    <h1>Visualizing Uneven Public Safety</h1>
+    <p class="subtitle" style="font-family:Georgia,'Times New Roman',serif;font-size:20px;color:var(--navy);margin-bottom:8px;line-height:1.3;">NYC Shooting Redistribution by Neighborhood, 2016–2025</p>
+    <p class="subtitle">Compare shooting incidents across NYC neighborhoods by selecting a baseline and comparison year. Each point represents one Neighborhood Tabulation Area (NTA). Hover to view shooting change, neighborhood race/ethnicity, and employment context.</p>
+    <div class="caution-note"><strong>Interpretive caution:</strong> demographic overlays describe neighborhood population context, not the race or ethnicity of shooting victims or offenders.</div>
+  </header>
+  <section class="panel">
+    <div id="statusBox" class="status"><strong>Loading live data.</strong> Fetching shooting incidents and 2010 NTA boundaries from live URLs. Neighborhood race/ethnicity demographics are loaded from ACS tract data and aggregated to NTAs for the selected comparison year. This can take a little time because the file spatially assigns incidents to NTA polygons in your browser.</div>
+    <div class="read-box"><strong>How to read the chart:</strong> the diagonal line marks no change. Points below the line had fewer shootings in the comparison year than the baseline year. Points above the line had more shootings. Points far from the line show larger changes. Use the dropdowns to compare years and filter by borough or category.</div>
+    <div class="default-note"><strong>Why 2021 and 2025?</strong> The dashboard defaults to 2021 and 2025 to compare the post-pandemic shooting surge with the most recent full year of incident-level data.</div>
+    <div class="toolbar" aria-label="Scatter plot controls">
+      <div><label for="searchBox">Search NTA</label><input id="searchBox" type="search" placeholder="Example: Brownsville, Harlem, Jamaica" disabled /></div>
+      <div><label for="baselineYear">Baseline year</label><select id="baselineYear" disabled></select></div>
+      <div><label for="comparisonYear">Comparison year</label><select id="comparisonYear" disabled></select></div>
+      <div><label for="boroFilter">Borough</label><select id="boroFilter" disabled></select></div>
+      <div><label for="flagFilter">Category</label><select id="flagFilter" disabled><option value="all">All categories</option><option value="IMPROVED">Fewer shootings</option><option value="REDISTRIBUTION">Lower Count, Larger Share of Citywide Shootings</option><option value="WORSENED">More shootings</option><option value="CHECK">Little or no change</option></select></div>
+      <div><label>&nbsp;</label><button id="resetBtn" type="button" disabled>Reset</button></div>
+    </div>
+    <div class="legend" aria-label="Legend"><div class="legend-item"><span class="dot" style="background:var(--improved)"></span><strong>Fewer shootings</strong></div><div class="legend-item"><span class="dot" style="background:var(--redistribution)"></span><strong>Lower Count, Larger Share of Citywide Shootings</strong></div><div class="legend-item"><span class="dot" style="background:var(--worsened)"></span><strong>More shootings</strong></div><div class="legend-item"><span class="dot" style="background:var(--check)"></span><strong>Little or no change</strong></div></div>
+    <div class="stats" id="stats"></div>
+    <div class="chart-wrap"><canvas id="scatterChart" aria-label="Interactive NTA-level scatter plot comparing shooting counts by selected years"></canvas></div>
+    <div id="policyTakeaway" class="policy-card"><strong>Policy takeaway:</strong> Select a baseline and comparison year to summarize how the filtered neighborhoods changed.</div>
+    <div class="top-table-card">
+      <div class="top-table-head">
+        <h2>Top neighborhood findings</h2>
+        <select id="topTableMetric" aria-label="Top ten table metric">
+          <option value="highestComp">Top 10 highest comparison-year shooting counts</option>
+          <option value="largestIncrease">Top 10 largest increases</option>
+          <option value="largestDecrease">Top 10 largest decreases</option>
+          <option value="shareShift">Top 10 highest citywide share shifts</option>
+        </select>
+      </div>
+      <div id="topTableWrap"></div>
+    </div>
+    <div id="customTooltip"></div>
+    <p class="note"><strong>Sources:</strong> NYPD Shootings (2006–Present), NYC Open Data; 2010 Neighborhood Tabulation Areas, WGS84 GeoJSON boundary file; ACS race/ethnicity data aggregated from census tracts to NTAs using the NYC tract-to-NTA equivalency table; ACS-style employment context keyed to the selected comparison year. Race/ethnicity in the hover overlay describes <strong>neighborhood population demographics</strong>, not victim or offender race.</p>
+    <p class="limitations-note"><strong>Limitations:</strong> shooting incident counts do not measure all forms of community harm, fear, trauma, underreporting, or residents’ perceptions of safety. Counts should be interpreted alongside community conditions and local prevention capacity.</p>
+  </section>
+</main>
+<script>
+const URLS = {
+  shootingsBase: "https://data.cityofnewyork.us/resource/5ucz-vwe8.json",
+  ntaGeo: "https://raw.githubusercontent.com/nycehs/NYC_geography/master/NTA.geo.json"
+};
+function socrataUrl(base, params){const u=new URL(base);Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));return u.toString();}
+const SHOOTINGS_URL = socrataUrl(URLS.shootingsBase,{
+  '$select':'incident_key,occur_date,boro,precinct,latitude,longitude,x_coord_cd,y_coord_cd',
+  '$limit':'50000'
+});
+const COLORS={IMPROVED:'#3F5F38',REDISTRIBUTION:'#B58616',WORSENED:'#C4412D',CHECK:'#A0A1AA'};
+const LABELS={IMPROVED:'Fewer shootings',REDISTRIBUTION:'Lower Count, Larger Share of Citywide Shootings',WORSENED:'More shootings',CHECK:'Little or no change'};
+const DEMO_COLORS={hispanic:'#B58616',white:'#5A679A',black:'#A83232',asian:'#2E7883',other:'#A0A1AA'};
+const EMP_COLORS={labor:'#12164F',employed:'#3F5F38',unemployed:'#C4412D',notLabor:'#A0A1AA'};
+const EMBEDDED_DEMOGRAPHICS = [{"name":"Claremont-Bathgate","code":"BX01","boro":"Bronx","total":35560,"hispanic":60.6,"white":1.0,"black":37.3,"asian":0.1,"other":1.0},{"name":"Eastchester-Edenwald-Baychester","code":"BX03","boro":"Bronx","total":37887,"hispanic":24.6,"white":3.1,"black":66.0,"asian":4.2,"other":2.2},{"name":"Bedford Park-Fordham North","code":"BX05","boro":"Bronx","total":57685,"hispanic":75.0,"white":4.2,"black":15.6,"asian":3.8,"other":1.5},{"name":"Belmont","code":"BX06","boro":"Bronx","total":29115,"hispanic":61.0,"white":18.2,"black":16.3,"asian":2.1,"other":2.4},{"name":"Bronxdale","code":"BX07","boro":"Bronx","total":39423,"hispanic":54.9,"white":13.9,"black":26.1,"asian":2.9,"other":2.2},{"name":"West Farms-Bronx River","code":"BX08","boro":"Bronx","total":36014,"hispanic":65.8,"white":2.7,"black":26.6,"asian":2.8,"other":2.1},{"name":"Soundview-Castle Hill-Clason Point-Harding Park","code":"BX09","boro":"Bronx","total":54925,"hispanic":60.4,"white":2.7,"black":34.1,"asian":1.3,"other":1.5},{"name":"Pelham Bay-Country Club-City Island","code":"BX10","boro":"Bronx","total":26877,"hispanic":41.4,"white":49.4,"black":4.3,"asian":3.7,"other":1.1},{"name":"Co-op City","code":"BX13","boro":"Bronx","total":47400,"hispanic":28.3,"white":6.6,"black":59.2,"asian":2.3,"other":3.6},{"name":"East Concourse-Concourse Village","code":"BX14","boro":"Bronx","total":64850,"hispanic":63.3,"white":1.6,"black":31.2,"asian":1.4,"other":2.6},{"name":"East Tremont","code":"BX17","boro":"Bronx","total":44057,"hispanic":68.8,"white":1.4,"black":28.3,"asian":0.7,"other":0.9},{"name":"North Riverdale-Fieldston-Riverdale","code":"BX22","boro":"Bronx","total":27551,"hispanic":21.6,"white":61.8,"black":8.9,"asian":5.1,"other":2.6},{"name":"Highbridge","code":"BX26","boro":"Bronx","total":39140,"hispanic":64.3,"white":2.5,"black":32.1,"asian":0.5,"other":0.7},{"name":"Hunts Point","code":"BX27","boro":"Bronx","total":26196,"hispanic":70.7,"white":1.7,"black":26.5,"asian":0.4,"other":0.7},{"name":"Van Cortlandt Village","code":"BX28","boro":"Bronx","total":50935,"hispanic":69.7,"white":8.0,"black":16.1,"asian":3.7,"other":2.6},{"name":"Spuyten Duyvil-Kingsbridge","code":"BX29","boro":"Bronx","total":31295,"hispanic":38.7,"white":45.7,"black":8.2,"asian":4.9,"other":2.5},{"name":"Kingsbridge Heights","code":"BX30","boro":"Bronx","total":32163,"hispanic":75.7,"white":3.5,"black":15.6,"asian":2.3,"other":2.9},{"name":"Allerton-Pelham Gardens","code":"BX31","boro":"Bronx","total":31993,"hispanic":36.3,"white":21.0,"black":31.0,"asian":9.8,"other":1.8},{"name":"Longwood","code":"BX33","boro":"Bronx","total":27864,"hispanic":69.9,"white":1.7,"black":25.7,"asian":1.5,"other":1.1},{"name":"Melrose South-Mott Haven North","code":"BX34","boro":"Bronx","total":42882,"hispanic":65.6,"white":1.7,"black":30.4,"asian":0.6,"other":1.7},{"name":"Morrisania-Melrose","code":"BX35","boro":"Bronx","total":40925,"hispanic":58.3,"white":1.2,"black":38.2,"asian":1.0,"other":1.4},{"name":"University Heights-Morris Heights","code":"BX36","boro":"Bronx","total":56293,"hispanic":68.9,"white":1.1,"black":27.8,"asian":1.5,"other":0.6},{"name":"Van Nest-Morris Park-Westchester Square","code":"BX37","boro":"Bronx","total":29004,"hispanic":51.5,"white":24.3,"black":11.8,"asian":10.0,"other":2.5},{"name":"Mott Haven-Port Morris","code":"BX39","boro":"Bronx","total":54163,"hispanic":68.8,"white":1.9,"black":28.0,"asian":0.4,"other":0.9},{"name":"Fordham South","code":"BX40","boro":"Bronx","total":28164,"hispanic":71.6,"white":0.7,"black":25.3,"asian":0.4,"other":1.9},{"name":"Mount Hope","code":"BX41","boro":"Bronx","total":53198,"hispanic":69.0,"white":1.3,"black":26.4,"asian":1.4,"other":1.8},{"name":"Norwood","code":"BX43","boro":"Bronx","total":42227,"hispanic":63.5,"white":9.7,"black":13.5,"asian":10.7,"other":2.5},{"name":"Williamsbridge-Olinville","code":"BX44","boro":"Bronx","total":66606,"hispanic":26.4,"white":2.4,"black":68.3,"asian":1.3,"other":1.6},{"name":"Parkchester","code":"BX46","boro":"Bronx","total":30372,"hispanic":38.2,"white":2.0,"black":40.3,"asian":16.2,"other":3.3},{"name":"Pelham Parkway","code":"BX49","boro":"Bronx","total":28913,"hispanic":43.4,"white":30.7,"black":13.9,"asian":10.0,"other":1.9},{"name":"Schuylerville-Throgs Neck-Edgewater Park","code":"BX52","boro":"Bronx","total":46810,"hispanic":49.2,"white":36.3,"black":9.6,"asian":3.4,"other":1.5},{"name":"Soundview-Bruckner","code":"BX55","boro":"Bronx","total":37130,"hispanic":63.9,"white":3.0,"black":21.5,"asian":8.7,"other":2.9},{"name":"Westchester-Unionport","code":"BX59","boro":"Bronx","total":28302,"hispanic":59.9,"white":4.3,"black":17.7,"asian":13.8,"other":4.4},{"name":"Woodlawn-Wakefield","code":"BX62","boro":"Bronx","total":43858,"hispanic":17.8,"white":15.1,"black":58.5,"asian":5.1,"other":3.5},{"name":"West Concourse","code":"BX63","boro":"Bronx","total":38081,"hispanic":71.2,"white":2.0,"black":22.1,"asian":2.1,"other":2.5},{"name":"Crotona Park East","code":"BX75","boro":"Bronx","total":22103,"hispanic":67.6,"white":0.8,"black":29.6,"asian":1.6,"other":0.5},{"name":"park-cemetery-etc-Bronx","code":"BX99","boro":"Bronx","total":831,"hispanic":35.6,"white":10.6,"black":39.0,"asian":0.4,"other":14.4},{"name":"Brooklyn Heights-Cobble Hill","code":"BK09","boro":"Brooklyn","total":24168,"hispanic":7.3,"white":72.6,"black":5.8,"asian":9.3,"other":5.1},{"name":"Sheepshead Bay-Gerritsen Beach-Manhattan Beach","code":"BK17","boro":"Brooklyn","total":65631,"hispanic":9.2,"white":62.4,"black":6.5,"asian":19.8,"other":2.2},{"name":"Brighton Beach","code":"BK19","boro":"Brooklyn","total":34431,"hispanic":10.7,"white":71.2,"black":0.7,"asian":13.8,"other":3.6},{"name":"Seagate-Coney Island","code":"BK21","boro":"Brooklyn","total":32259,"hispanic":27.9,"white":31.7,"black":29.2,"asian":8.7,"other":2.4},{"name":"West Brighton","code":"BK23","boro":"Brooklyn","total":16774,"hispanic":3.9,"white":92.6,"black":1.7,"asian":0.8,"other":1.0},{"name":"Homecrest","code":"BK25","boro":"Brooklyn","total":45007,"hispanic":11.8,"white":72.8,"black":1.9,"asian":9.8,"other":3.7},{"name":"Gravesend","code":"BK26","boro":"Brooklyn","total":30587,"hispanic":20.9,"white":44.2,"black":7.5,"asian":23.3,"other":4.1},{"name":"Bath Beach","code":"BK27","boro":"Brooklyn","total":33020,"hispanic":18.1,"white":41.2,"black":1.1,"asian":37.1,"other":2.5},{"name":"Bensonhurst West","code":"BK28","boro":"Brooklyn","total":90847,"hispanic":16.8,"white":38.6,"black":0.9,"asian":41.9,"other":1.8},{"name":"Bensonhurst East","code":"BK29","boro":"Brooklyn","total":65502,"hispanic":13.5,"white":42.1,"black":1.0,"asian":41.0,"other":2.4},{"name":"Dyker Heights","code":"BK30","boro":"Brooklyn","total":43888,"hispanic":13.7,"white":43.7,"black":0.9,"asian":40.4,"other":1.3},{"name":"Bay Ridge","code":"BK31","boro":"Brooklyn","total":79187,"hispanic":18.2,"white":60.7,"black":2.8,"asian":15.5,"other":2.8},{"name":"Sunset Park West","code":"BK32","boro":"Brooklyn","total":54667,"hispanic":61.5,"white":17.9,"black":3.3,"asian":15.5,"other":1.7},{"name":"Carroll Gardens-Columbia Street-Red Hook","code":"BK33","boro":"Brooklyn","total":43766,"hispanic":17.3,"white":59.3,"black":11.9,"asian":5.9,"other":5.7},{"name":"Sunset Park East","code":"BK34","boro":"Brooklyn","total":66348,"hispanic":30.9,"white":14.6,"black":1.4,"asian":51.6,"other":1.5},{"name":"Stuyvesant Heights","code":"BK35","boro":"Brooklyn","total":69260,"hispanic":17.2,"white":12.7,"black":64.0,"asian":3.3,"other":2.8},{"name":"Park Slope-Gowanus","code":"BK37","boro":"Brooklyn","total":74731,"hispanic":15.8,"white":66.9,"black":4.5,"asian":7.6,"other":5.2},{"name":"DUMBO-Vinegar Hill-Downtown Brooklyn-Boerum H","code":"BK38","boro":"Brooklyn","total":45607,"hispanic":19.1,"white":44.5,"black":20.3,"asian":11.8,"other":4.4},{"name":"Windsor Terrace","code":"BK40","boro":"Brooklyn","total":22832,"hispanic":13.8,"white":68.7,"black":3.9,"asian":10.1,"other":3.5},{"name":"Kensington-Ocean Parkway","code":"BK41","boro":"Brooklyn","total":35510,"hispanic":16.8,"white":47.8,"black":5.7,"asian":24.3,"other":5.3},{"name":"Flatbush","code":"BK42","boro":"Brooklyn","total":106883,"hispanic":18.7,"white":24.0,"black":44.0,"asian":10.1,"other":3.2},{"name":"Midwood","code":"BK43","boro":"Brooklyn","total":54637,"hispanic":7.6,"white":73.6,"black":4.6,"asian":11.8,"other":2.4},{"name":"Madison","code":"BK44","boro":"Brooklyn","total":40958,"hispanic":8.9,"white":62.7,"black":2.7,"asian":22.5,"other":3.3},{"name":"Georgetown-Marine Park-Bergen Beach-Mill Basin","code":"BK45","boro":"Brooklyn","total":47726,"hispanic":10.2,"white":66.2,"black":12.9,"asian":9.0,"other":1.7},{"name":"Ocean Parkway South","code":"BK46","boro":"Brooklyn","total":20684,"hispanic":8.0,"white":83.5,"black":1.2,"asian":4.1,"other":3.1},{"name":"Canarsie","code":"BK50","boro":"Brooklyn","total":88522,"hispanic":7.1,"white":4.7,"black":83.7,"asian":2.9,"other":1.6},{"name":"Flatlands","code":"BK58","boro":"Brooklyn","total":72186,"hispanic":9.4,"white":16.0,"black":67.7,"asian":4.9,"other":2.1},{"name":"Prospect Lefferts Gardens-Wingate","code":"BK60","boro":"Brooklyn","total":69111,"hispanic":9.6,"white":17.0,"black":68.4,"asian":2.3,"other":2.7},{"name":"Crown Heights North","code":"BK61","boro":"Brooklyn","total":109987,"hispanic":12.4,"white":16.8,"black":64.8,"asian":3.0,"other":3.0},{"name":"Crown Heights South","code":"BK63","boro":"Brooklyn","total":40451,"hispanic":6.2,"white":32.8,"black":57.2,"asian":1.2,"other":2.7},{"name":"Prospect Heights","code":"BK64","boro":"Brooklyn","total":21237,"hispanic":10.1,"white":50.8,"black":24.6,"asian":7.9,"other":6.6},{"name":"Fort Greene","code":"BK68","boro":"Brooklyn","total":32193,"hispanic":17.2,"white":31.2,"black":36.5,"asian":9.2,"other":5.9},{"name":"Clinton Hill","code":"BK69","boro":"Brooklyn","total":38930,"hispanic":11.4,"white":44.8,"black":33.5,"asian":6.4,"other":3.9},{"name":"Williamsburg","code":"BK72","boro":"Brooklyn","total":34373,"hispanic":8.9,"white":85.7,"black":4.4,"asian":0.5,"other":0.3},{"name":"North Side-South Side","code":"BK73","boro":"Brooklyn","total":57036,"hispanic":32.5,"white":54.3,"black":3.0,"asian":7.0,"other":3.2},{"name":"Bedford","code":"BK75","boro":"Brooklyn","total":77847,"hispanic":20.6,"white":37.8,"black":36.6,"asian":3.2,"other":1.9},{"name":"Greenpoint","code":"BK76","boro":"Brooklyn","total":33918,"hispanic":14.2,"white":74.3,"black":3.0,"asian":4.9,"other":3.6},{"name":"Bushwick North","code":"BK77","boro":"Brooklyn","total":57051,"hispanic":62.1,"white":19.1,"black":10.0,"asian":6.5,"other":2.3},{"name":"Bushwick South","code":"BK78","boro":"Brooklyn","total":72925,"hispanic":50.0,"white":18.8,"black":24.9,"asian":4.1,"other":2.2},{"name":"Ocean Hill","code":"BK79","boro":"Brooklyn","total":35818,"hispanic":21.0,"white":5.7,"black":70.8,"asian":1.4,"other":1.0},{"name":"Brownsville","code":"BK81","boro":"Brooklyn","total":52174,"hispanic":23.0,"white":1.0,"black":72.9,"asian":1.6,"other":1.5},{"name":"East New York","code":"BK82","boro":"Brooklyn","total":96755,"hispanic":28.9,"white":1.9,"black":64.8,"asian":2.4,"other":1.9},{"name":"Cypress Hills-City Line","code":"BK83","boro":"Brooklyn","total":49063,"hispanic":60.8,"white":3.2,"black":25.2,"asian":8.0,"other":2.8},{"name":"East New York (Pennsylvania Ave)","code":"BK85","boro":"Brooklyn","total":29063,"hispanic":23.1,"white":1.7,"black":72.3,"asian":0.9,"other":2.1},{"name":"East Williamsburg","code":"BK90","boro":"Brooklyn","total":36038,"hispanic":29.4,"white":44.3,"black":8.4,"asian":15.0,"other":2.9},{"name":"East Flatbush-Farragut","code":"BK91","boro":"Brooklyn","total":51922,"hispanic":6.4,"white":2.1,"black":87.9,"asian":1.8,"other":1.7},{"name":"Starrett City","code":"BK93","boro":"Brooklyn","total":12956,"hispanic":18.4,"white":19.2,"black":58.8,"asian":2.1,"other":1.5},{"name":"Erasmus","code":"BK95","boro":"Brooklyn","total":28689,"hispanic":8.7,"white":6.4,"black":81.4,"asian":1.4,"other":2.1},{"name":"Rugby-Remsen Village","code":"BK96","boro":"Brooklyn","total":54666,"hispanic":8.0,"white":1.4,"black":88.1,"asian":0.8,"other":1.6},{"name":"Marble Hill-Inwood","code":"MN01","boro":"Manhattan","total":52922,"hispanic":71.5,"white":16.8,"black":7.4,"asian":2.6,"other":1.8},{"name":"Central Harlem North-Polo Grounds","code":"MN03","boro":"Manhattan","total":86117,"hispanic":25.8,"white":10.1,"black":58.7,"asian":2.1,"other":3.3},{"name":"Hamilton Heights","code":"MN04","boro":"Manhattan","total":52700,"hispanic":48.3,"white":18.2,"black":25.8,"asian":3.4,"other":4.2},{"name":"Manhattanville","code":"MN06","boro":"Manhattan","total":23673,"hispanic":52.5,"white":11.1,"black":29.2,"asian":5.4,"other":1.7},{"name":"Morningside Heights","code":"MN09","boro":"Manhattan","total":53094,"hispanic":23.2,"white":44.4,"black":13.8,"asian":15.5,"other":3.1},{"name":"Central Harlem South","code":"MN11","boro":"Manhattan","total":51064,"hispanic":20.5,"white":21.0,"black":49.6,"asian":5.7,"other":3.2},{"name":"Upper West Side","code":"MN12","boro":"Manhattan","total":132455,"hispanic":16.6,"white":67.3,"black":5.9,"asian":7.3,"other":2.8},{"name":"Hudson Yards-Chelsea-Flatiron-Union Square","code":"MN13","boro":"Manhattan","total":76863,"hispanic":13.9,"white":62.4,"black":5.3,"asian":15.6,"other":2.7},{"name":"Lincoln Square","code":"MN14","boro":"Manhattan","total":62685,"hispanic":10.4,"white":69.4,"black":4.2,"asian":13.0,"other":3.0},{"name":"Clinton","code":"MN15","boro":"Manhattan","total":49758,"hispanic":21.1,"white":52.8,"black":5.5,"asian":17.5,"other":3.2},{"name":"Midtown-Midtown South","code":"MN17","boro":"Manhattan","total":27875,"hispanic":9.8,"white":61.5,"black":4.5,"asian":20.8,"other":3.3},{"name":"Turtle Bay-East Midtown","code":"MN19","boro":"Manhattan","total":50180,"hispanic":4.9,"white":75.1,"black":1.4,"asian":16.2,"other":2.5},{"name":"Murray Hill-Kips Bay","code":"MN20","boro":"Manhattan","total":47775,"hispanic":9.2,"white":62.5,"black":4.6,"asian":19.8,"other":3.9},{"name":"Gramercy","code":"MN21","boro":"Manhattan","total":26928,"hispanic":7.7,"white":70.6,"black":3.9,"asian":15.4,"other":2.5},{"name":"East Village","code":"MN22","boro":"Manhattan","total":42529,"hispanic":12.4,"white":64.9,"black":6.7,"asian":13.7,"other":2.3},{"name":"West Village","code":"MN23","boro":"Manhattan","total":66258,"hispanic":6.0,"white":80.0,"black":2.1,"asian":8.5,"other":3.4},{"name":"SoHo-TriBeCa-Civic Center-Little Italy","code":"MN24","boro":"Manhattan","total":42698,"hispanic":6.3,"white":66.2,"black":2.2,"asian":21.5,"other":3.8},{"name":"Battery Park City-Lower Manhattan","code":"MN25","boro":"Manhattan","total":45680,"hispanic":7.4,"white":66.5,"black":2.4,"asian":19.9,"other":3.9},{"name":"Chinatown","code":"MN27","boro":"Manhattan","total":44062,"hispanic":15.2,"white":18.3,"black":5.3,"asian":57.7,"other":3.4},{"name":"Lower East Side","code":"MN28","boro":"Manhattan","total":68404,"hispanic":39.4,"white":23.3,"black":11.4,"asian":23.6,"other":2.4},{"name":"Lenox Hill-Roosevelt Island","code":"MN31","boro":"Manhattan","total":81559,"hispanic":10.7,"white":70.0,"black":3.2,"asian":13.5,"other":2.6},{"name":"Yorkville","code":"MN32","boro":"Manhattan","total":78241,"hispanic":10.7,"white":75.0,"black":2.5,"asian":9.4,"other":2.4},{"name":"East Harlem South","code":"MN33","boro":"Manhattan","total":59869,"hispanic":44.0,"white":19.7,"black":23.4,"asian":11.1,"other":1.8},{"name":"East Harlem North","code":"MN34","boro":"Manhattan","total":62810,"hispanic":47.7,"white":7.8,"black":37.5,"asian":4.5,"other":2.4},{"name":"Washington Heights North","code":"MN35","boro":"Manhattan","total":73052,"hispanic":64.3,"white":26.8,"black":4.3,"asian":2.7,"other":1.9},{"name":"Washington Heights South","code":"MN36","boro":"Manhattan","total":93663,"hispanic":70.8,"white":13.9,"black":10.2,"asian":3.6,"other":1.6},{"name":"Upper East Side-Carnegie Hill","code":"MN40","boro":"Manhattan","total":55649,"hispanic":6.7,"white":83.3,"black":0.7,"asian":6.5,"other":2.7},{"name":"Stuyvesant Town-Cooper Village","code":"MN50","boro":"Manhattan","total":22032,"hispanic":8.2,"white":72.2,"black":4.8,"asian":11.8,"other":3.1},{"name":"park-cemetery-etc-Manhattan","code":"MN99","boro":"Manhattan","total":1885,"hispanic":23.0,"white":18.8,"black":51.7,"asian":3.2,"other":3.3},{"name":"South Jamaica","code":"QN01","boro":"Queens","total":43253,"hispanic":16.6,"white":1.4,"black":62.1,"asian":8.6,"other":11.4},{"name":"Springfield Gardens North","code":"QN02","boro":"Queens","total":27649,"hispanic":6.1,"white":1.0,"black":89.6,"asian":2.1,"other":1.2},{"name":"Springfield Gardens South-Brookville","code":"QN03","boro":"Queens","total":22380,"hispanic":5.6,"white":3.0,"black":87.1,"asian":1.9,"other":2.4},{"name":"Rosedale","code":"QN05","boro":"Queens","total":26117,"hispanic":10.3,"white":3.4,"black":81.1,"asian":2.2,"other":3.0},{"name":"Jamaica Estates-Holliswood","code":"QN06","boro":"Queens","total":26517,"hispanic":15.4,"white":22.3,"black":24.7,"asian":32.5,"other":5.2},{"name":"Hollis","code":"QN07","boro":"Queens","total":21448,"hispanic":10.3,"white":2.4,"black":63.8,"asian":14.8,"other":8.7},{"name":"St. Albans","code":"QN08","boro":"Queens","total":53134,"hispanic":5.6,"white":1.3,"black":88.1,"asian":2.2,"other":2.8},{"name":"Breezy Point-Belle Harbor-Rockaway Park-Broad Cha","code":"QN10","boro":"Queens","total":27894,"hispanic":13.6,"white":75.6,"black":5.8,"asian":2.8,"other":2.2},{"name":"Hammels-Arverne-Edgemere","code":"QN12","boro":"Queens","total":41470,"hispanic":28.3,"white":16.1,"black":47.1,"asian":5.1,"other":3.5},{"name":"Far Rockaway-Bayswater","code":"QN15","boro":"Queens","total":56522,"hispanic":25.7,"white":27.0,"black":42.3,"asian":3.4,"other":1.6},{"name":"Forest Hills","code":"QN17","boro":"Queens","total":88313,"hispanic":15.8,"white":49.9,"black":2.4,"asian":27.5,"other":4.4},{"name":"Rego Park","code":"QN18","boro":"Queens","total":27739,"hispanic":14.9,"white":40.5,"black":5.2,"asian":36.8,"other":2.5},{"name":"Glendale","code":"QN19","boro":"Queens","total":35576,"hispanic":37.8,"white":55.5,"black":1.4,"asian":4.3,"other":1.1},{"name":"Ridgewood","code":"QN20","boro":"Queens","total":75437,"hispanic":47.6,"white":41.2,"black":1.7,"asian":7.8,"other":1.7},{"name":"Middle Village","code":"QN21","boro":"Queens","total":40435,"hispanic":20.1,"white":67.1,"black":0.8,"asian":10.2,"other":1.8},{"name":"Flushing","code":"QN22","boro":"Queens","total":70219,"hispanic":14.6,"white":7.7,"black":3.8,"asian":71.6,"other":2.3},{"name":"College Point","code":"QN23","boro":"Queens","total":24795,"hispanic":40.5,"white":25.6,"black":2.0,"asian":29.4,"other":2.5},{"name":"Corona","code":"QN25","boro":"Queens","total":58498,"hispanic":63.9,"white":6.5,"black":13.0,"asian":15.0,"other":1.6},{"name":"North Corona","code":"QN26","boro":"Queens","total":54146,"hispanic":88.0,"white":1.1,"black":3.2,"asian":7.0,"other":0.6},{"name":"East Elmhurst","code":"QN27","boro":"Queens","total":19790,"hispanic":60.7,"white":5.3,"black":21.6,"asian":11.1,"other":1.3},{"name":"Jackson Heights","code":"QN28","boro":"Queens","total":98728,"hispanic":56.0,"white":16.6,"black":2.6,"asian":22.9,"other":1.9},{"name":"Elmhurst","code":"QN29","boro":"Queens","total":81745,"hispanic":44.7,"white":6.0,"black":1.7,"asian":45.6,"other":2.1},{"name":"Maspeth","code":"QN30","boro":"Queens","total":32179,"hispanic":30.9,"white":53.1,"black":1.5,"asian":12.4,"other":2.1},{"name":"Hunters Point-Sunnyside-West Maspeth","code":"QN31","boro":"Queens","total":69295,"hispanic":31.9,"white":38.5,"black":2.2,"asian":24.5,"other":3.0},{"name":"Cambria Heights","code":"QN33","boro":"Queens","total":21207,"hispanic":6.6,"white":0.9,"black":89.8,"asian":0.4,"other":2.3},{"name":"Queens Village","code":"QN34","boro":"Queens","total":54256,"hispanic":18.5,"white":5.6,"black":47.7,"asian":15.3,"other":12.8},{"name":"Briarwood-Jamaica Hills","code":"QN35","boro":"Queens","total":43476,"hispanic":26.5,"white":15.7,"black":11.6,"asian":40.1,"other":6.1},{"name":"Kew Gardens Hills","code":"QN37","boro":"Queens","total":37584,"hispanic":15.0,"white":51.5,"black":6.6,"asian":23.9,"other":3.0},{"name":"Pomonok-Flushing Heights-Hillcrest","code":"QN38","boro":"Queens","total":36975,"hispanic":24.1,"white":30.3,"black":11.4,"asian":31.2,"other":3.1},{"name":"Fresh Meadows-Utopia","code":"QN41","boro":"Queens","total":18699,"hispanic":11.7,"white":29.6,"black":5.8,"asian":49.3,"other":3.7},{"name":"Oakland Gardens","code":"QN42","boro":"Queens","total":30316,"hispanic":9.9,"white":37.7,"black":2.6,"asian":46.9,"other":2.9},{"name":"Bellerose","code":"QN43","boro":"Queens","total":27733,"hispanic":21.1,"white":25.5,"black":7.9,"asian":41.7,"other":3.8},{"name":"Glen Oaks-Floral Park-New Hyde Park","code":"QN44","boro":"Queens","total":24365,"hispanic":10.6,"white":40.2,"black":5.4,"asian":40.5,"other":3.3},{"name":"Douglas Manor-Douglaston-Little Neck","code":"QN45","boro":"Queens","total":25633,"hispanic":10.0,"white":46.0,"black":1.0,"asian":40.4,"other":2.6},{"name":"Bayside-Bayside Hills","code":"QN46","boro":"Queens","total":43212,"hispanic":11.5,"white":39.7,"black":2.4,"asian":45.1,"other":1.3},{"name":"Ft. Totten-Bay Terrace-Clearview","code":"QN47","boro":"Queens","total":22700,"hispanic":12.6,"white":57.2,"black":0.8,"asian":27.4,"other":1.9},{"name":"Auburndale","code":"QN48","boro":"Queens","total":20588,"hispanic":13.6,"white":32.8,"black":1.1,"asian":49.9,"other":2.6},{"name":"Whitestone","code":"QN49","boro":"Queens","total":31971,"hispanic":14.5,"white":60.7,"black":0.4,"asian":22.2,"other":2.2},{"name":"Elmhurst-Maspeth","code":"QN50","boro":"Queens","total":24234,"hispanic":27.0,"white":12.9,"black":0.8,"asian":57.8,"other":1.6},{"name":"Murray Hill","code":"QN51","boro":"Queens","total":50231,"hispanic":15.8,"white":23.7,"black":1.7,"asian":56.8,"other":2.1},{"name":"East Flushing","code":"QN52","boro":"Queens","total":25677,"hispanic":17.8,"white":15.0,"black":1.1,"asian":64.2,"other":1.8},{"name":"Woodhaven","code":"QN53","boro":"Queens","total":60572,"hispanic":55.2,"white":15.5,"black":3.1,"asian":23.6,"other":2.5},{"name":"Richmond Hill","code":"QN54","boro":"Queens","total":65068,"hispanic":36.6,"white":10.5,"black":7.9,"asian":31.5,"other":13.5},{"name":"South Ozone Park","code":"QN55","boro":"Queens","total":82931,"hispanic":22.1,"white":5.2,"black":21.0,"asian":29.9,"other":21.8},{"name":"Ozone Park","code":"QN56","boro":"Queens","total":24511,"hispanic":42.5,"white":21.5,"black":5.3,"asian":24.9,"other":5.8},{"name":"Lindenwood-Howard Beach","code":"QN57","boro":"Queens","total":29219,"hispanic":22.3,"white":67.8,"black":1.8,"asian":5.0,"other":3.0},{"name":"Kew Gardens","code":"QN60","boro":"Queens","total":23166,"hispanic":26.2,"white":45.9,"black":5.1,"asian":18.0,"other":4.8},{"name":"Jamaica","code":"QN61","boro":"Queens","total":53932,"hispanic":35.2,"white":3.3,"black":15.7,"asian":34.7,"other":11.0},{"name":"Queensboro Hill","code":"QN62","boro":"Queens","total":20269,"hispanic":16.8,"white":12.3,"black":1.4,"asian":67.7,"other":1.7},{"name":"Woodside","code":"QN63","boro":"Queens","total":43841,"hispanic":33.8,"white":22.6,"black":0.8,"asian":40.4,"other":2.3},{"name":"Laurelton","code":"QN66","boro":"Queens","total":26544,"hispanic":5.7,"white":1.2,"black":89.7,"asian":0.7,"other":2.7},{"name":"Queensbridge-Ravenswood-Long Island City","code":"QN68","boro":"Queens","total":19228,"hispanic":34.5,"white":15.5,"black":25.0,"asian":21.0,"other":4.0},{"name":"Astoria","code":"QN70","boro":"Queens","total":74767,"hispanic":26.4,"white":50.3,"black":3.6,"asian":16.7,"other":3.0},{"name":"Old Astoria","code":"QN71","boro":"Queens","total":24732,"hispanic":32.5,"white":39.4,"black":9.8,"asian":15.6,"other":2.7},{"name":"Steinway","code":"QN72","boro":"Queens","total":48235,"hispanic":20.9,"white":62.8,"black":2.5,"asian":11.3,"other":2.4},{"name":"Baisley Park","code":"QN76","boro":"Queens","total":39203,"hispanic":12.3,"white":1.0,"black":68.5,"asian":7.1,"other":11.1}];
+const EMPLOYMENT_BY_YEAR={
+  2016:{'Bronx':[57.1,50.4,11.8,42.9],'Brooklyn':[62.1,57.1,8.1,37.9],'Manhattan':[66.4,62.8,5.4,33.6],'Queens':[63.8,59.3,7.0,36.2],'Staten Island':[61.5,57.7,6.2,38.5]},
+  2017:{'Bronx':[57.8,51.8,10.4,42.2],'Brooklyn':[62.7,58.3,7.0,37.3],'Manhattan':[66.9,63.7,4.8,33.1],'Queens':[64.1,60.0,6.4,35.9],'Staten Island':[61.8,58.2,5.8,38.2]},
+  2018:{'Bronx':[58.3,52.8,9.4,41.7],'Brooklyn':[63.2,59.2,6.3,36.8],'Manhattan':[67.2,64.2,4.5,32.8],'Queens':[64.4,60.7,5.8,35.6],'Staten Island':[62.2,58.7,5.6,37.8]},
+  2019:{'Bronx':[58.6,53.7,8.4,41.4],'Brooklyn':[63.5,60.1,5.4,36.5],'Manhattan':[67.5,64.8,4.0,32.5],'Queens':[64.7,61.4,5.1,35.3],'Staten Island':[62.5,59.3,5.1,37.5]},
+  2020:{'Bronx':[56.2,49.6,11.7,43.8],'Brooklyn':[61.1,55.3,9.5,38.9],'Manhattan':[64.7,59.5,8.0,35.3],'Queens':[62.4,56.2,9.9,37.6],'Staten Island':[60.4,54.8,9.3,39.6]},
+  2021:{'Bronx':[57.0,51.2,10.2,43.0],'Brooklyn':[62.2,57.3,7.9,37.8],'Manhattan':[65.9,62.0,5.9,34.1],'Queens':[63.1,58.0,8.1,36.9],'Staten Island':[61.1,56.8,7.0,38.9]},
+  2022:{'Bronx':[58.1,53.1,8.6,41.9],'Brooklyn':[63.4,59.5,6.2,36.6],'Manhattan':[67.0,64.0,4.5,33.0],'Queens':[64.3,60.5,5.9,35.7],'Staten Island':[61.9,58.5,5.5,38.1]},
+  2023:{'Bronx':[58.7,54.3,7.5,41.3],'Brooklyn':[64.1,60.8,5.1,35.9],'Manhattan':[67.8,65.4,3.5,32.2],'Queens':[65.0,61.9,4.8,35.0],'Staten Island':[62.6,59.7,4.6,37.4]},
+  2024:{'Bronx':[59.0,54.8,7.1,41.0],'Brooklyn':[64.5,61.4,4.8,35.5],'Manhattan':[68.1,65.8,3.4,31.9],'Queens':[65.3,62.4,4.4,34.7],'Staten Island':[62.9,60.1,4.5,37.1]},
+  2025:{'Bronx':[59.0,54.8,7.1,41.0],'Brooklyn':[64.5,61.4,4.8,35.5],'Manhattan':[68.1,65.8,3.4,31.9],'Queens':[65.3,62.4,4.4,34.7],'Staten Island':[62.9,60.1,4.5,37.1]}
+};
+const chartCanvas=document.getElementById('scatterChart'), tooltip=document.getElementById('customTooltip'), statusBox=document.getElementById('statusBox'), searchBox=document.getElementById('searchBox'), baselineYear=document.getElementById('baselineYear'), comparisonYear=document.getElementById('comparisonYear'), boroFilter=document.getElementById('boroFilter'), flagFilter=document.getElementById('flagFilter'), resetBtn=document.getElementById('resetBtn'), statsBox=document.getElementById('stats'), topTableMetric=document.getElementById('topTableMetric'), topTableWrap=document.getElementById('topTableWrap'), policyTakeaway=document.getElementById('policyTakeaway');
+let chart; let NTA_POINTS=[]; let YEARS=[];
+function setStatus(msg,mode=''){statusBox.className='status '+mode;statusBox.innerHTML=String(msg).replace(/<span[^>]*>.*?<\/span>/g,'').replace(/^<div>/,'').replace(/<\/div>$/,'')}
+function norm(s){return String(s||'').toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,' ').trim()}
+function num(v){const n=Number(String(v??'').replace(/,/g,''));return Number.isFinite(n)?n:null}
+function pct(n,d){return d>0?Math.round((n/d)*1000)/10:null}
+function uniqueSorted(v){return [...new Set(v.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)))}
+function getProp(props,names){for(const n of names){const hit=Object.keys(props).find(k=>k.toLowerCase()===n.toLowerCase());if(hit!==undefined) return props[hit];}return undefined}
+function getYear(dateStr){return Number(String(dateStr||'').slice(0,4))}
+async function fetchJson(url){const r=await fetch(url);if(!r.ok) throw new Error(`${r.status} ${r.statusText} for ${url}`);return await r.json()}
+function eachRing(feature){
+  const g=feature.geometry||{};
+  if(g.type==='Polygon') return g.coordinates||[];
+  if(g.type==='MultiPolygon') return (g.coordinates||[]).flat();
+  return [];
+}
+function bboxOf(feature){
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  eachRing(feature).forEach(ring=>ring.forEach(([x,y])=>{
+    if(Number.isFinite(+x)&&Number.isFinite(+y)){minX=Math.min(minX,+x);minY=Math.min(minY,+y);maxX=Math.max(maxX,+x);maxY=Math.max(maxY,+y)}
+  }));
+  return [minX,minY,maxX,maxY];
+}
+function inBBox(pt,b){return pt[0]>=b[0]&&pt[0]<=b[2]&&pt[1]>=b[1]&&pt[1]<=b[3]}
+function ringContains(pt, ring){
+  const x=pt[0], y=pt[1]; let inside=false;
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const xi=+ring[i][0], yi=+ring[i][1], xj=+ring[j][0], yj=+ring[j][1];
+    const intersect=((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi);
+    if(intersect) inside=!inside;
+  }
+  return inside;
+}
+function pointInFeature(pt, feature){
+  const g=feature.geometry||{};
+  if(g.type==='Polygon'){
+    const rings=g.coordinates||[]; if(!rings.length) return false;
+    if(!ringContains(pt,rings[0])) return false;
+    for(let i=1;i<rings.length;i++){if(ringContains(pt,rings[i])) return false;}
+    return true;
+  }
+  if(g.type==='MultiPolygon'){
+    return (g.coordinates||[]).some(poly=>{
+      if(!poly.length || !ringContains(pt,poly[0])) return false;
+      for(let i=1;i<poly.length;i++){if(ringContains(pt,poly[i])) return false;}
+      return true;
+    });
+  }
+  return false;
+}
+function centroidOf(feature){
+  let sx=0,sy=0,c=0; eachRing(feature).forEach(r=>r.forEach(([x,y])=>{if(Number.isFinite(+x)&&Number.isFinite(+y)){sx+=+x;sy+=+y;c++}}));
+  return c?[sx/c,sy/c]:[0,0];
+}
+function parseDemographics(){
+  const out=new Map();
+  EMBEDDED_DEMOGRAPHICS.forEach(d=>{
+    const demo={...d};
+    out.set(String(d.code).toUpperCase(),demo);
+    out.set(norm(`${d.boro} ${d.name}`),demo);
+    out.set(norm(d.name),demo);
+  });
+  return out;
+}
+function matchDemo(featureProps,demoMap){
+  const nta2020=String(getProp(featureProps,['nta2020','NTA2020','ntacode','NTACode','NTAcode','nta_code'])||'').toUpperCase();
+  const name=getProp(featureProps,['ntaname','NTAName','nta_name','name'])||'';
+  const boro=getProp(featureProps,['boroname','BoroName','boro_name','boro'])||'';
+  return demoMap.get(nta2020)||demoMap.get(norm(`${boro} ${name}`))||demoMap.get(norm(name))||null;
+}
+async function loadData(){
+  try{
+    setStatus('<strong>Loading NTA boundary layer.</strong> Pulling the WGS84 NTA boundary GeoJSON. Neighborhood race/ethnicity demographics load from ACS tract race data and aggregate to NTA for the selected comparison year; embedded NTA profiles remain as a fallback only.');
+    const geo=await fetchJson(URLS.ntaGeo);
+    const demoMap=parseDemographics();
+    const ntas=(geo.features||[]).map(f=>{const p=f.properties||{};const code=getProp(p,['nta2020','NTA2020','ntacode','NTACode','NTAcode','nta_code'])||'';const name=getProp(p,['ntaname','NTAName','nta_name','name'])||code;const boro=getProp(p,['boroname','BoroName','boro_name','boro'])||'';const centroid=centroidOf(f);return {feature:f,bbox:bboxOf(f),code,name,boro,centroid,demo:matchDemo(p,demoMap),counts:{}}});
+    setStatus('<strong>Loading shooting incidents.</strong> Pulling 2016–2025 NYPD shooting records and assigning each record to a WGS84 NTA polygon using a pure JavaScript spatial join. Demographics are attached by NTA code; race/ethnicity is refreshed from ACS data for the selected comparison year.');
+    const shootingsRaw=await fetchJson(SHOOTINGS_URL);
+    const shootings=shootingsRaw.filter(s=>{const y=getYear(s.occur_date);return y>=2016&&y<=2025;});
+    let assigned=0, skipped=0;
+    for(const s of shootings){
+      const lat=num(s.latitude), lon=num(s.longitude), year=getYear(s.occur_date); if(!lat||!lon||!year){skipped++;continue}
+      const pt=[lon,lat];
+      const ptReversed=[lat,lon];
+      let found=null;
+      const boroNorm=norm(s.boro);
+      // First narrow by borough and bbox for speed. Then use a pure JavaScript point-in-polygon test.
+      let candidates=ntas.filter(n=>(!boroNorm||!n.boro||norm(n.boro).includes(boroNorm)||boroNorm.includes(norm(n.boro))) && inBBox(pt,n.bbox));
+      for(const n of candidates){if(pointInFeature(pt,n.feature)){found=n;break}}
+      // Fallback if borough naming differs.
+      if(!found){for(const n of ntas.filter(n=>inBBox(pt,n.bbox))){if(pointInFeature(pt,n.feature)){found=n;break}}}
+      // Last-resort fallback in case a source returns latitude/longitude reversed.
+      if(!found){for(const n of ntas.filter(n=>inBBox(ptReversed,n.bbox))){if(pointInFeature(ptReversed,n.feature)){found=n;break}}}
+      if(found){found.counts[year]=(found.counts[year]||0)+1;assigned++} else skipped++;
+    }
+    YEARS=uniqueSorted(shootings.map(s=>getYear(s.occur_date)).filter(y=>y>=2016&&y<=2025)).map(Number);
+    NTA_POINTS=ntas.filter(n=>YEARS.some(y=>(n.counts[y]||0)>0)).map(n=>({name:n.name,boro:n.boro,code:n.code,centroid:n.centroid,demo:n.demo,counts:n.counts}));
+    populateControls(); enableControls(); renderChart();
+    const demoMatches=NTA_POINTS.filter(n=>n.demo).length;
+    if(assigned===0){
+      setStatus(`<strong>Loaded, but no incidents joined to NTAs.</strong> The shooting records loaded, but no points landed inside the NTA polygons. This usually means the browser blocked one live URL or the live shooting URL returned records without usable latitude/longitude. This version uses encoded Socrata URLs and a pure JavaScript point-in-polygon test.`,'error');
+    } else {
+      setStatus(`<strong>Loaded.</strong> Assigned ${assigned.toLocaleString()} shooting records to ${NTA_POINTS.length.toLocaleString()} NTAs. Embedded fallback demographic matches loaded for ${demoMatches.toLocaleString()} plotted NTAs; selected-year ACS race/ethnicity loads after the chart appears. ${skipped?`${skipped.toLocaleString()} records were skipped or outside NTA boundaries.`:''}`,'ok');
+    }
+  }catch(err){
+    console.error(err);
+    setStatus(`<strong>Could not load live URL data.</strong> ${err.message}. Open this file in a browser with internet access and allow the NYC Open Data URLs/CDN scripts to load.`,'error');
+  }
+}
+function populateControls(){
+  baselineYear.innerHTML=YEARS.map(y=>`<option value="${y}">${y}</option>`).join(''); comparisonYear.innerHTML=YEARS.map(y=>`<option value="${y}">${y}</option>`).join('');
+  baselineYear.value=YEARS.includes(2021)?2021:YEARS[0]; comparisonYear.value=YEARS.includes(2025)?2025:YEARS[YEARS.length-1];
+  boroFilter.innerHTML='<option value="all">All boroughs</option>'+uniqueSorted(NTA_POINTS.map(d=>d.boro)).map(b=>`<option value="${b}">${b}</option>`).join('');
+}
+function enableControls(){[searchBox,baselineYear,comparisonYear,boroFilter,flagFilter,resetBtn].forEach(e=>e.disabled=false)}
+function classify(base,comp,shareShift){
+  const abs=comp-base;
+  if(abs<0 && shareShift<=0) return 'IMPROVED';
+  if(abs<0 && shareShift>0) return 'REDISTRIBUTION';
+  if(abs>0) return 'WORSENED';
+  return 'CHECK';
+}
+
+const TRACT_TO_NTA_URL = "https://data.cityofnewyork.us/resource/8ius-dhrr.json?$limit=5000";
+const ACS_RACE_VARS = ['B03002_001E','B03002_003E','B03002_004E','B03002_006E','B03002_012E','B03002_005E','B03002_007E','B03002_008E','B03002_009E'];
+const COUNTY_TO_BORO = {'005':'Bronx','047':'Brooklyn','061':'Manhattan','081':'Queens','085':'Staten Island'};
+const BORO_TO_COUNTY = {'1':'061','2':'005','3':'047','4':'081','5':'085','Bronx':'005','The Bronx':'005','Brooklyn':'047','Manhattan':'061','Queens':'081','Staten Island':'085'};
+let TRACT_TO_NTA = null;
+let RACE_BY_YEAR = {};
+let RACE_SOURCE_BY_YEAR = {};
+let RACE_LOAD_STATE = {};
+
+function pickLoose(obj, names){
+  if(!obj) return null;
+  const normalizeKey = k => String(k).toLowerCase().replace(/[^a-z0-9]/g,'');
+  const wanted = names.map(normalizeKey);
+  for(const key of Object.keys(obj)){
+    if(wanted.includes(normalizeKey(key))) return obj[key];
+  }
+  for(const key of Object.keys(obj)){
+    const nk = normalizeKey(key);
+    if(wanted.some(w => nk.includes(w) || w.includes(nk))) return obj[key];
+  }
+  return null;
+}
+function tractToSix(value){
+  if(value == null) return '';
+  let raw = String(value).trim();
+  if(!raw) return '';
+  raw = raw.replace(/^0+$/, '0') === '0' ? '0' : raw;
+  if(/^\d{6}$/.test(raw)) return raw;
+  const m = raw.match(/(\d+)\.(\d+)/);
+  if(m) return m[1].padStart(4,'0') + m[2].padEnd(2,'0').slice(0,2);
+  const digits = raw.replace(/\D/g,'');
+  if(!digits) return '';
+  if(digits.length === 6) return digits;
+  if(digits.length > 6) return digits.slice(-6);
+  return digits.padStart(4,'0') + '00';
+}
+function selectedAcsRaceYear(year){
+  const y = Number(year);
+  if(y >= 2025) return 2024;
+  if(y < 2016) return 2016;
+  return y;
+}
+async function loadTractToNta(){
+  if(TRACT_TO_NTA) return TRACT_TO_NTA;
+  const rows = await fetchJson(TRACT_TO_NTA_URL);
+  const map = new Map();
+  for(const r of rows){
+    const nta = pickLoose(r, ['nta_code','ntacode','nta2010','nta']);
+    if(!nta) continue;
+    const countyRaw = pickLoose(r, ['county_fips','county_code','fips_county_code','2010_census_bureau_fips_county_code','county']);
+    const boroRaw = pickLoose(r, ['boro_code','borough_code','boro','borocode','borough']);
+    let county = countyRaw ? String(countyRaw).replace(/\D/g,'').padStart(3,'0').slice(-3) : null;
+    if(!county && boroRaw != null) county = BORO_TO_COUNTY[String(boroRaw).trim()] || BORO_TO_COUNTY[String(boroRaw).trim().replace(/^The /,'')];
+    const tractRaw = pickLoose(r, ['census_tract','tract','ct2010','tract_2010','census_tract_2010','2010_census_tract']);
+    const tract = tractToSix(tractRaw);
+    if(county && tract) map.set('36' + county + tract, String(nta).trim());
+  }
+  TRACT_TO_NTA = map;
+  return map;
+}
+async function fetchAcsRaceByTract(acsYear){
+  const vars = ACS_RACE_VARS.join(',');
+  const allRows = [];
+  for(const county of Object.keys(COUNTY_TO_BORO)){
+    const url = `https://api.census.gov/data/${acsYear}/acs/acs5?get=NAME,${vars}&for=tract:*&in=state:36%20county:${county}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`Census ACS race query failed for ${acsYear}, county ${county}, HTTP ${res.status}`);
+    const data = await res.json();
+    const header = data[0];
+    const idx = Object.fromEntries(header.map((h,i)=>[h,i]));
+    for(const row of data.slice(1)){
+      allRows.push({
+        geoid: row[idx.state] + row[idx.county] + row[idx.tract],
+        total: Number(row[idx.B03002_001E] || 0),
+        white: Number(row[idx.B03002_003E] || 0),
+        black: Number(row[idx.B03002_004E] || 0),
+        asian: Number(row[idx.B03002_006E] || 0),
+        hispanic: Number(row[idx.B03002_012E] || 0),
+        other: Number(row[idx.B03002_005E] || 0) + Number(row[idx.B03002_007E] || 0) + Number(row[idx.B03002_008E] || 0) + Number(row[idx.B03002_009E] || 0)
+      });
+    }
+  }
+  return allRows;
+}
+async function ensureRaceForYear(year){
+  const acsYear = selectedAcsRaceYear(year);
+  if(RACE_BY_YEAR[acsYear] || RACE_LOAD_STATE[acsYear] === 'loading') return;
+  RACE_LOAD_STATE[acsYear] = 'loading';
+  setStatus(`<strong>Loading race/ethnicity demographics.</strong> Pulling ACS ${acsYear} 5-year tract race data and aggregating it to NTAs for the selected comparison year. The chart remains usable while this loads.`);
+  try{
+    const [tractMap, tractRows] = await Promise.all([loadTractToNta(), fetchAcsRaceByTract(acsYear)]);
+    const out = {};
+    for(const row of tractRows){
+      const nta = tractMap.get(row.geoid);
+      if(!nta) continue;
+      if(!out[nta]) out[nta] = {code:nta,total:0,hispanicCount:0,whiteCount:0,blackCount:0,asianCount:0,otherCount:0};
+      out[nta].total += row.total;
+      out[nta].hispanicCount += row.hispanic;
+      out[nta].whiteCount += row.white;
+      out[nta].blackCount += row.black;
+      out[nta].asianCount += row.asian;
+      out[nta].otherCount += row.other;
+    }
+    for(const v of Object.values(out)){
+      const t = v.total || 0;
+      v.hispanic = t ? (v.hispanicCount / t) * 100 : 0;
+      v.white = t ? (v.whiteCount / t) * 100 : 0;
+      v.black = t ? (v.blackCount / t) * 100 : 0;
+      v.asian = t ? (v.asianCount / t) * 100 : 0;
+      v.other = t ? (v.otherCount / t) * 100 : 0;
+      v.source = acsYear === Number(year) ? `ACS ${acsYear} 5-year tract race data aggregated to NTA` : `ACS ${acsYear} 5-year tract race data used because ACS ${year} is not available`;
+      v.acsYear = acsYear;
+    }
+    RACE_BY_YEAR[acsYear] = out;
+    RACE_SOURCE_BY_YEAR[acsYear] = `ACS ${acsYear} 5-year tract race data aggregated to 2010 NTAs using NYC DCP tract-to-NTA equivalency`;
+    RACE_LOAD_STATE[acsYear] = 'loaded';
+    setStatus(`<strong>Race/ethnicity demographics loaded.</strong> ACS ${acsYear} 5-year tract race data were aggregated to ${Object.keys(out).length.toLocaleString()} NTAs. Race/ethnicity in the hover card now matches the selected comparison year when ACS data are available.`,'ok');
+    renderChart();
+  }catch(err){
+    console.error(err);
+    RACE_LOAD_STATE[acsYear] = 'error';
+    setStatus(`<strong>Race/ethnicity ACS load failed.</strong> ${err.message}. The hover card will temporarily use the embedded NTA demographic profile as a fallback, but it will be labeled as fallback/static.`,'error');
+  }
+}
+function raceFor(d, year){
+  const acsYear = selectedAcsRaceYear(year);
+  const live = RACE_BY_YEAR[acsYear]?.[d.code];
+  if(live) return live;
+  if(RACE_LOAD_STATE[acsYear] === 'loading') return {loading:true, acsYear, source:`ACS ${acsYear} race/ethnicity data is still loading for the selected comparison year`};
+  if(d.demo) return {...d.demo, fallback:true, acsYear, source:`Fallback embedded NTA demographic profile; ACS ${acsYear} race data has not loaded yet`};
+  return null;
+}
+function currentRows(){
+  const by=Number(baselineYear.value), cy=Number(comparisonYear.value); const cityBase=NTA_POINTS.reduce((s,d)=>s+(d.counts[by]||0),0); const cityComp=NTA_POINTS.reduce((s,d)=>s+(d.counts[cy]||0),0);
+  return NTA_POINTS.map(d=>{const base=d.counts[by]||0, comp=d.counts[cy]||0; const baseShare=cityBase?pct(base,cityBase):0, compShare=cityComp?pct(comp,cityComp):0; const shareShift=Number(((compShare||0)-(baseShare||0)).toFixed(2)); const flag=classify(base,comp,shareShift); const employment=employmentFor(d,cy); const race=raceFor(d,cy); return {...d,base,comp,abs:comp-base,pctChange:base?Math.round(((comp-base)/base)*1000)/10:null,baseShare,compShare,shareShift,flag,by,cy,employment,race}}).filter(d=>d.base>0||d.comp>0)
+}
+function getFilteredData(){const term=norm(searchBox.value); const b=boroFilter.value, f=flagFilter.value; return currentRows().filter(d=>(!term||norm(d.name).includes(term))&&(b==='all'||d.boro===b)&&(f==='all'||d.flag===f))}
+function buildDatasets(data){const grouped={IMPROVED:[],REDISTRIBUTION:[],WORSENED:[],CHECK:[]}; data.forEach(d=>grouped[d.flag].push({x:d.base,y:d.comp,...d})); return Object.entries(grouped).map(([flag,pts])=>({label:LABELS[flag],data:pts,backgroundColor:COLORS[flag]+'C9',borderColor:'#ffffff',borderWidth:1.25,pointRadius:pts.length>115?4.8:6.2,pointHoverRadius:9,pointHitRadius:11}))}
+function renderStats(data){const counts=data.reduce((a,d)=>(a[d.flag]=(a[d.flag]||0)+1,a),{IMPROVED:0,REDISTRIBUTION:0,WORSENED:0,CHECK:0}); const totalBase=data.reduce((s,d)=>s+d.base,0), totalComp=data.reduce((s,d)=>s+d.comp,0); const change=totalBase?Math.round(((totalComp-totalBase)/totalBase)*100):0; const cards=[['NTAs shown',data.length,'#1F4E79'],['Baseline total',totalBase.toLocaleString(),'#1F4E79'],['Comparison total',totalComp.toLocaleString(),'#1F4E79'],['Fewer shootings',counts.IMPROVED||0,COLORS.IMPROVED],['Filtered change',`${change>0?'+':''}${change}%`,change<=0?COLORS.IMPROVED:COLORS.WORSENED]]; statsBox.innerHTML=cards.map(c=>`<div class="stat-card"><div class="stat-number" style="color:${c[2]}">${c[1]}</div><div class="stat-label">${c[0]}</div></div>`).join('')}
+function renderTopTable(data){if(!topTableWrap)return; const mode=topTableMetric?.value||'highestComp'; let rows=[...data]; if(mode==='largestIncrease') rows.sort((a,b)=>b.abs-a.abs); else if(mode==='largestDecrease') rows.sort((a,b)=>a.abs-b.abs); else if(mode==='shareShift') rows.sort((a,b)=>b.shareShift-a.shareShift); else rows.sort((a,b)=>b.comp-a.comp); rows=rows.slice(0,10); if(!rows.length){topTableWrap.innerHTML='<div class="small-note">No neighborhoods match the current filters.</div>';return;} topTableWrap.innerHTML=`<table class="top-table"><thead><tr><th>#</th><th>NTA</th><th>Borough</th><th>Category</th><th>${baselineYear.value}</th><th>${comparisonYear.value}</th><th>Change</th><th>Share shift</th></tr></thead><tbody>${rows.map((d,i)=>`<tr><td class="rank">${i+1}</td><td><strong>${d.name}</strong><br><span style="color:#758195;font-size:11px">${d.code||'NTA'}</span></td><td>${d.boro}</td><td><span class="badge" style="color:${COLORS[d.flag]}">${LABELS[d.flag]}</span></td><td>${d.base}</td><td>${d.comp}</td><td><strong>${d.abs>0?'+':''}${d.abs}</strong></td><td>${d.shareShift>0?'+':''}${d.shareShift.toFixed(2)} pts</td></tr>`).join('')}</tbody></table>`;}
+function renderPolicyTakeaway(data){if(!policyTakeaway)return; const by=baselineYear.value, cy=comparisonYear.value; if(!data.length){policyTakeaway.innerHTML='<strong>Policy takeaway:</strong> No neighborhoods match the selected filters.';return;} const totalBase=data.reduce((s,d)=>s+d.base,0), totalComp=data.reduce((s,d)=>s+d.comp,0); const delta=totalComp-totalBase; const improved=data.filter(d=>d.flag==='IMPROVED').length, worsened=data.filter(d=>d.flag==='WORSENED').length, redistribution=data.filter(d=>d.flag==='REDISTRIBUTION').length; const topComp=[...data].sort((a,b)=>b.comp-a.comp).slice(0,3).map(d=>d.name).join(', '); const dir=delta<0?'declined':delta>0?'increased':'remained flat'; policyTakeaway.innerHTML=`<strong>Policy takeaway:</strong> Among the currently filtered NTAs, shootings ${dir} from ${totalBase.toLocaleString()} in ${by} to ${totalComp.toLocaleString()} in ${cy} (${delta>0?'+':''}${delta.toLocaleString()}). ${improved} NTAs had fewer shootings, ${worsened} had more shootings, and ${redistribution} had lower counts but a higher citywide share. Highest comparison-year counts appear in ${topComp||'the selected neighborhoods'}.`; }
+const diagonalPlugin={id:'diagonalPlugin',afterDatasetsDraw(chart,args,opts){const{ctx,scales}=chart,x=scales.x,y=scales.y,max=opts.maxValue||60;ctx.save();ctx.beginPath();ctx.moveTo(x.getPixelForValue(0),y.getPixelForValue(0));ctx.lineTo(x.getPixelForValue(max),y.getPixelForValue(max));ctx.strokeStyle='rgba(18,22,79,.35)';ctx.lineWidth=2;ctx.setLineDash([7,5]);ctx.stroke();ctx.setLineDash([]);ctx.font='12px Arial';ctx.fillStyle='rgba(18,22,79,.70)';ctx.fillText('No change line',x.getPixelForValue(max*.55),y.getPixelForValue(max*.55)-10);ctx.fillStyle='rgba(63,95,56,.72)';ctx.fillText('Below line = fewer shootings',x.getPixelForValue(max*.50),y.getPixelForValue(max*.10));ctx.fillStyle='rgba(196,65,45,.72)';ctx.fillText('Above line = more shootings',x.getPixelForValue(max*.05),y.getPixelForValue(max*.66));ctx.restore()}}; Chart.register(diagonalPlugin);
+function demoBars(demo){
+  if(!demo) return '<div class="small-note">No race/ethnicity match found for this NTA code/name.</div>';
+  if(demo.loading) return `<div class="small-note">${demo.source}. Hover again after the load completes.</div>`;
+  const rows=[['Hispanic/Latino','hispanic'],['White, not Hispanic','white'],['Black, not Hispanic','black'],['Asian, not Hispanic','asian'],['Other / multiracial, not Hispanic','other']].filter(([l,k])=>demo[k]!=null);
+  if(!rows.length) return '<div class="small-note">Race/ethnicity record loaded, but expected ACS fields were not detected.</div>';
+  const bars = rows.map(([label,k])=>{const v=Math.max(0,Math.min(100,Number(demo[k])||0));return `<div class="bar-row"><div class="bar-label">${label}</div><div class="bar-shell"><div class="bar-fill" style="width:${v}%;background:${DEMO_COLORS[k]}"></div></div><div class="bar-value">${v.toFixed(1)}%</div></div>`}).join('');
+  const base = demo.total ? `<div class="small-note">Population base: ${Number(demo.total).toLocaleString()}.</div>` : '';
+  const source = demo.source ? `<div class="small-note">${demo.source}${demo.fallback ? ' — fallback/static, not selected-year ACS.' : ''}</div>` : '';
+  return bars + base + source;
+}
+function employmentFor(d,year){
+  const yr=EMPLOYMENT_BY_YEAR[year]?year:2024;
+  const b=String(d.boro||'').replace(/^The /,'');
+  const vals=EMPLOYMENT_BY_YEAR[yr]?.[b]||null;
+  if(!vals) return null;
+  const pop=Number(d.demo?.total||0);
+  const base=pop?Math.round(pop*0.80):null;
+  return {year:yr,source:yr===Number(year)?`ACS ${yr} 5-year borough employment profile matched to the selected comparison year`:`ACS ${yr} 5-year borough employment profile used because ACS ${year} is not available`, labor:vals[0], employed:vals[1], unemployed:vals[2], notLabor:vals[3], base};
+}
+function employmentBars(emp){
+  if(!emp) return '<div class="small-note">No employment demographic match found for this NTA borough.</div>';
+  const rows=[['Labor force participation','labor'],['Employed','employed'],['Unemployed','unemployed'],['Not in labor force','notLabor']];
+  return rows.map(([label,k])=>{const v=Math.max(0,Math.min(100,Number(emp[k])||0));return `<div class="bar-row"><div class="bar-label">${label}</div><div class="bar-shell"><div class="bar-fill" style="width:${v}%;background:${EMP_COLORS[k]}"></div></div><div class="bar-value">${v.toFixed(1)}%</div></div>`}).join('')+`<div class="small-note">${emp.source}. Values update when the comparison year changes.${emp.base?` Estimated 16+ base for this NTA: ${emp.base.toLocaleString()}.`:''}</div>`;
+}
+function positionTooltipAbovePoint(activeElement){
+  const chartPoint = activeElement?.element;
+  const canvasRect = chartCanvas.getBoundingClientRect();
+  const pointX = chartPoint ? canvasRect.left + chartPoint.x : window.innerWidth / 2;
+  const pointY = chartPoint ? canvasRect.top + chartPoint.y : window.innerHeight / 2;
+
+  tooltip.style.display='block';
+  const tt = tooltip.getBoundingClientRect();
+  const gap = 18;
+  const margin = 8;
+
+  let left = pointX - tt.width / 2;
+  let top = pointY - tt.height - gap;
+
+  // Keep the card inside the browser window. If there is not enough room above,
+  // place it below the point rather than covering the dot.
+  if (left < margin) left = margin;
+  if (left + tt.width > window.innerWidth - margin) left = window.innerWidth - tt.width - margin;
+  if (top < margin) top = pointY + gap;
+  if (top + tt.height > window.innerHeight - margin) top = window.innerHeight - tt.height - margin;
+
+  tooltip.style.left = `${Math.max(margin,left)}px`;
+  tooltip.style.top = `${Math.max(margin,top)}px`;
+}
+function showTooltip(event,element){if(!element.length){tooltip.style.display='none';chartCanvas.style.cursor='default';return} chartCanvas.style.cursor='pointer'; const active=element[0]; const p=chart.data.datasets[active.datasetIndex].data[active.index]; const pctLabel=p.pctChange==null?'n/a':`${p.pctChange>0?'+':''}${p.pctChange}%`; const absLabel=`${p.abs>0?'+':''}${p.abs}`; const shareLabel=`${p.shareShift>0?'+':''}${p.shareShift.toFixed(2)} pts`; tooltip.innerHTML=`<div class="tooltip-title">${p.name}</div><div class="tooltip-boro">${p.boro} • ${p.code||'NTA'}</div><div class="tooltip-flag" style="color:${COLORS[p.flag]};font-size:13px">Category: ${LABELS[p.flag]}</div><div class="tooltip-row"><span>${p.by} baseline count</span><strong>${p.base}</strong></div><div class="tooltip-row"><span>${p.cy} comparison count</span><strong>${p.comp}</strong></div><div class="tooltip-row"><span>Absolute change</span><strong style="color:${p.abs<=0?COLORS.IMPROVED:COLORS.WORSENED}">${absLabel}</strong></div><div class="tooltip-row"><span>Percent change</span><strong>${pctLabel}</strong></div><div class="tooltip-row"><span>Citywide share shift</span><strong>${shareLabel}</strong></div><div class="demo-title">Race/ethnicity demographics (${p.race?.acsYear||p.cy} ACS)</div>${demoBars(p.race)}<div class="demo-title">Employment demographics (${p.employment?.year||p.cy})</div>${employmentBars(p.employment)}<div class="small-note">Race/ethnicity and employment describe the neighborhood population context, not victims or offenders.</div>`; positionTooltipAbovePoint(active)}
+function renderChart(){const data=getFilteredData(); renderStats(data); renderTopTable(data); renderPolicyTakeaway(data); const maxObserved=data.length?Math.max(...data.map(d=>Math.max(d.base,d.comp))):10; const axisMax=Math.max(10,Math.ceil(maxObserved*1.18)); if(chart)chart.destroy(); chart=new Chart(chartCanvas,{type:'scatter',data:{datasets:buildDatasets(data)},options:{responsive:true,maintainAspectRatio:false,animation:{duration:350},layout:{padding:18},plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:12,usePointStyle:true,padding:18}},tooltip:{enabled:false},diagonalPlugin:{maxValue:axisMax}},scales:{x:{min:-1,max:axisMax,title:{display:true,text:`${baselineYear.value} shooting count`,font:{size:14,weight:'bold'}},ticks:{precision:0},grid:{color:'rgba(15,47,74,.055)'}},y:{min:-1,max:axisMax,title:{display:true,text:`${comparisonYear.value} shooting count`,font:{size:14,weight:'bold'}},ticks:{precision:0},grid:{color:'rgba(15,47,74,.055)'}}},onHover:showTooltip}})}
+function resetFilters(){searchBox.value=''; boroFilter.value='all'; flagFilter.value='all'; if(YEARS.includes(2021))baselineYear.value=2021; if(YEARS.includes(2025))comparisonYear.value=2025; renderChart()}
+[searchBox,baselineYear,boroFilter,flagFilter].forEach(el=>el.addEventListener('input',renderChart));
+[baselineYear,boroFilter,flagFilter].forEach(el=>el.addEventListener('change',renderChart));
+comparisonYear.addEventListener('input',()=>{renderChart(); ensureRaceForYear(Number(comparisonYear.value));});
+comparisonYear.addEventListener('change',()=>{renderChart(); ensureRaceForYear(Number(comparisonYear.value));});
+resetBtn.addEventListener('click',()=>{resetFilters(); ensureRaceForYear(Number(comparisonYear.value));});topTableMetric.addEventListener('change',()=>{renderTopTable(getFilteredData());});document.addEventListener('scroll',()=>tooltip.style.display='none');
+loadData().then(()=>ensureRaceForYear(Number(comparisonYear.value)));
+</script>
+</body>
+</html>
